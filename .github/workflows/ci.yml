@@ -39,7 +39,7 @@ jobs:
       - name: Checkout Infra Repo
         uses: actions/checkout@v3
         with:
-          repository: USERNAME_TAU/habit-tracker-infra
+          repository: Leush91/habit-tracker-infra
           token: ${{ secrets.INFRA_REPO_PAT }}
           path: infra
 
