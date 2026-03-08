@@ -51,7 +51,7 @@ jobs:
       - name: Update values.yaml
         run: |
           export IMAGE_TAG=${{ env.IMAGE_TAG }}
-          yq -i '.image.tag = strenv(IMAGE_TAG)' infra/helm/values.yaml
+          yq -i '.image.tag = strenv(IMAGE_TAG)' charts/habit-tracker/values.yaml
 
       # 9️⃣ Commit și Push în repo infra
       - name: Commit and Push Changes
