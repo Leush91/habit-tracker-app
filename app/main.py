@@ -2,6 +2,8 @@ from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 from .db import engine, SessionLocal
 from .models import Base, Habit
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 app = FastAPI()
 
@@ -25,4 +27,9 @@ def create_habit(name: str, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(habit)
     return habit
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/")
+def serve_frontend():
+    return FileResponse("static/index.html")
 

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Habit Tracker</title>
+</head>
+<body>
+
+<h1>Habit Tracker</h1>
+
+<input id="habitInput" placeholder="New habit" />
+<button onclick="addHabit()">Add</button>
+
+<h2>Habits:</h2>
+<ul id="habitList"></ul>
+
+<script>
+async function loadHabits() {
+  const res = await fetch("/habits");
+  const data = await res.json();
+
+  const list = document.getElementById("habitList");
+  list.innerHTML = "";
+
+  data.forEach(habit => {
+    const li = document.createElement("li");
+    li.textContent = habit.name;
+    list.appendChild(li);
+  });
+}
+
+async function addHabit() {
+  const name = document.getElementById("habitInput").value;
+
+  await fetch(`/habits?name=${name}`, {
+    method: "POST"
+  });
+
+  document.getElementById("habitInput").value = "";
+  loadHabits();
+}
+
+loadHabits();
+</script>
+
+</body>
+</html>
