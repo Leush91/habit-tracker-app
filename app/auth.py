@@ -16,12 +16,38 @@ KEYCLOAK_CLIENT_ID = os.getenv("KEYCLOAK_CLIENT_ID", "habit-tracker")
 
 
 def get_signing_key(token: str):
-    jwks = httpx.get(KEYCLOAK_JWKS_URL, timeout=5.0).json()
-    unverified_header = jwt.get_unverified_header(token)
-    kid = unverified_header.get("kid")
+    try:
+        response = httpx.get(KEYCLOAK_JWKS_URL, timeout=5.0, follow_redirects=True)
+        response.raise_for_status()
+        jwks = response.json()
+    except httpx.HTTPError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Cannot reach Keycloak JWKS: {str(e)}"
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Keycloak JWKS response was not valid JSON"
+        )
+
+    if "keys" not in jwks:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Keycloak JWKS payload missing 'keys'"
+        )
+
+    try:
+        unverified_header = jwt.get_unverified_header(token)
+        kid = unverified_header.get("kid")
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token header"
+        )
 
     for key in jwks["keys"]:
-        if key["kid"] == kid:
+        if key.get("kid") == kid:
             return jwt.algorithms.RSAAlgorithm.from_jwk(key)
 
     raise HTTPException(
@@ -48,13 +74,15 @@ def get_current_token_payload(
 
         return payload
 
+    except HTTPException:
+        raise
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token expired"
         )
-    except jwt.InvalidTokenError:
+    except jwt.InvalidTokenError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token"
+            detail=f"Invalid token: {str(e)}"
         )
