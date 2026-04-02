@@ -2,45 +2,101 @@
 <html>
 <head>
   <title>Habit Tracker</title>
+  <script src="http://auth.local/js/keycloak.js"></script>
 </head>
 <body>
+  <h1>Habit Tracker</h1>
 
-<h1>Habit Tracker</h1>
+  <button onclick="login()">Login</button>
+  <button onclick="logout()">Logout</button>
 
-<input id="habitInput" placeholder="New habit" />
-<button onclick="addHabit()">Add</button>
+  <p id="userInfo">Not logged in</p>
 
-<h2>Habits:</h2>
-<ul id="habitList"></ul>
+  <input id="habitInput" placeholder="New habit" />
+  <button onclick="addHabit()">Add</button>
 
-<script>
-async function loadHabits() {
-  const res = await fetch("/habits");
-  const data = await res.json();
+  <h2>Habits:</h2>
+  <ul id="habitList"></ul>
 
-  const list = document.getElementById("habitList");
-  list.innerHTML = "";
+  <script>
+    let keycloak = new Keycloak({
+      url: "http://auth.local",
+      realm: "devops-lvlup",
+      clientId: "habit-tracker"
+    });
 
-  data.forEach(habit => {
-    const li = document.createElement("li");
-    li.textContent = habit.name;
-    list.appendChild(li);
-  });
-}
+    async function initAuth() {
+      const authenticated = await keycloak.init({
+        onLoad: "check-sso",
+        pkceMethod: "S256"
+      });
 
-async function addHabit() {
-  const name = document.getElementById("habitInput").value;
+      if (authenticated) {
+        document.getElementById("userInfo").textContent =
+          "Logged in as: " + keycloak.tokenParsed.preferred_username;
+      } else {
+        document.getElementById("userInfo").textContent = "Not logged in";
+      }
+    }
 
-  await fetch(`/habits?name=${name}`, {
-    method: "POST"
-  });
+    function login() {
+      keycloak.login();
+    }
 
-  document.getElementById("habitInput").value = "";
-  loadHabits();
-}
+    function logout() {
+      keycloak.logout({
+        redirectUri: "https://habit.local"
+      });
+    }
 
-loadHabits();
-</script>
+    async function loadHabits() {
+      if (!keycloak.authenticated) {
+        return;
+      }
 
+      const res = await fetch("/habits", {
+        headers: {
+          "Authorization": "Bearer " + keycloak.token
+        }
+      });
+
+      const data = await res.json();
+
+      const list = document.getElementById("habitList");
+      list.innerHTML = "";
+
+      data.forEach(habit => {
+        const li = document.createElement("li");
+        li.textContent = habit.name;
+        list.appendChild(li);
+      });
+    }
+
+    async function addHabit() {
+      if (!keycloak.authenticated) {
+        alert("Please login first");
+        return;
+      }
+
+      const name = document.getElementById("habitInput").value;
+
+      const res = await fetch(`/habits?name=${encodeURIComponent(name)}`, {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + keycloak.token
+        }
+      });
+
+      if (res.status === 403) {
+        alert("You do not have permission to add habits");
+        return;
+      }
+
+      document.getElementById("habitInput").value = "";
+      loadHabits();
+    }
+
+    initAuth().then(loadHabits);
+  </script>
 </body>
 </html>
