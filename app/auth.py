@@ -91,3 +91,16 @@ def get_current_token_payload(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid token: {str(e)}"
         )
+def require_roles(allowed_roles: list[str]):
+    def role_checker(payload: dict = Depends(get_current_token_payload)):
+        user_roles = payload.get("realm_access", {}).get("roles", [])
+
+        if not any(role in user_roles for role in allowed_roles):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden"
+            )
+
+        return payload
+
+    return role_checker        
