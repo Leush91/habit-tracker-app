@@ -9,7 +9,7 @@ security = HTTPBearer()
 
 KEYCLOAK_ISSUER = os.getenv(
     "KEYCLOAK_ISSUER",
-    "http://auth.local/realms/devops-lvlup"
+    "https://auth.local/realms/devops-lvlup"
 )
 
 KEYCLOAK_JWKS_URL = os.getenv(
