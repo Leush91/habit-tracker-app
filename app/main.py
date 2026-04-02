@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 from .db import engine, SessionLocal
 from .models import Base, Habit
-from .auth import get_current_token_payload, require_roles
+from .auth import require_roles
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
@@ -19,13 +19,17 @@ def get_db():
 
 @app.get("/habits")
 def list_habits(
-    payload: dict = Depends(get_current_token_payload),
+    payload: dict = Depends(require_roles(["reader", "writer", "admin"])),
     db: Session = Depends(get_db),
 ):
     return db.query(Habit).all()
 
 @app.post("/habits")
-def create_habit(name: str, db: Session = Depends(get_db)):
+def create_habit(
+    name: str,
+    payload: dict = Depends(require_roles(["writer", "admin"])),
+    db: Session = Depends(get_db),
+):
     habit = Habit(name=name)
     db.add(habit)
     db.commit()
