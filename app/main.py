@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 from .db import engine, SessionLocal
 from .models import Base, Habit
-from .auth import get_current_token_payload
+from .auth import get_current_token_payload, require_roles
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
