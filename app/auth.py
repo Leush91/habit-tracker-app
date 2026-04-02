@@ -16,6 +16,7 @@ KEYCLOAK_JWKS_URL = os.getenv(
     "KEYCLOAK_JWKS_URL",
     "http://10.96.88.49/realms/devops-lvlup/protocol/openid-connect/certs"
 )
+
 KEYCLOAK_CLIENT_ID = os.getenv("KEYCLOAK_CLIENT_ID", "habit-tracker")
 
 
