@@ -9,12 +9,12 @@ security = HTTPBearer()
 
 KEYCLOAK_ISSUER = os.getenv(
     "KEYCLOAK_ISSUER",
-    "http://keycloak.keycloak.svc.cluster.local/realms/devops-lvlup"
+    "http://auth.local/realms/devops-lvlup"
 )
 
 KEYCLOAK_JWKS_URL = os.getenv(
     "KEYCLOAK_JWKS_URL",
-    "http://keycloak.keycloak.svc.cluster.local/realms/devops-lvlup/protocol/openid-connect/certs"
+    "http://10.96.88.49/realms/devops-lvlup/protocol/openid-connect/certs"
 )
 KEYCLOAK_CLIENT_ID = os.getenv("KEYCLOAK_CLIENT_ID", "habit-tracker")
 
