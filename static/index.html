@@ -1,102 +1,292 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Habit Tracker</title>
-  <script src="http://auth.local/js/keycloak.js"></script>
+  <script src="https://auth.local/js/keycloak.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 0 16px;
+    }
+
+    .topbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .status {
+      padding: 8px 12px;
+      background: #f3f3f3;
+      border-radius: 6px;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 10px;
+      margin: 20px 0;
+    }
+
+    input {
+      flex: 1;
+      padding: 10px;
+    }
+
+    button {
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+
+    .message {
+      margin: 12px 0;
+      font-weight: bold;
+    }
+
+    .error {
+      color: #b00020;
+    }
+
+    .success {
+      color: #0a7a2f;
+    }
+
+    ul {
+      padding-left: 20px;
+    }
+  </style>
 </head>
 <body>
   <h1>Habit Tracker</h1>
 
-  <button onclick="login()">Login</button>
-  <button onclick="logout()">Logout</button>
+  <div class="topbar">
+    <button onclick="login()">Login</button>
+    <button onclick="logout()">Logout</button>
+    <div id="userInfo" class="status">Initializing...</div>
+  </div>
 
-  <p id="userInfo">Not logged in</p>
+  <div class="form-row">
+    <input id="habitInput" placeholder="New habit" />
+    <button onclick="addHabit()">Add</button>
+  </div>
 
-  <input id="habitInput" placeholder="New habit" />
-  <button onclick="addHabit()">Add</button>
+  <div id="message" class="message"></div>
 
-  <h2>Habits:</h2>
+  <h2>Habits</h2>
   <ul id="habitList"></ul>
 
   <script>
-    let keycloak = new Keycloak({
-      url: "http://auth.local",
-      realm: "devops-lvlup",
-      clientId: "habit-tracker"
-    });
+    let keycloak = null;
+
+    function setMessage(text, type = "") {
+      const el = document.getElementById("message");
+      el.textContent = text;
+      el.className = "message " + type;
+    }
+
+    function clearMessage() {
+      setMessage("", "");
+    }
+
+    function updateUserInfo() {
+      const userInfo = document.getElementById("userInfo");
+
+      if (!keycloak || !keycloak.authenticated) {
+        userInfo.textContent = "Not logged in";
+        return;
+      }
+
+      const username = keycloak.tokenParsed?.preferred_username || "unknown";
+      const roles = keycloak.tokenParsed?.realm_access?.roles || [];
+      userInfo.textContent = `Logged in as: ${username} | Roles: ${roles.join(", ")}`;
+    }
 
     async function initAuth() {
-      const authenticated = await keycloak.init({
-        onLoad: "check-sso",
-        pkceMethod: "S256"
-      });
+      try {
+        if (typeof Keycloak === "undefined") {
+          setMessage("Keycloak script did not load.", "error");
+          console.error("Keycloak is undefined");
+          return;
+        }
 
-      if (authenticated) {
-        document.getElementById("userInfo").textContent =
-          "Logged in as: " + keycloak.tokenParsed.preferred_username;
-      } else {
-        document.getElementById("userInfo").textContent = "Not logged in";
+        keycloak = new Keycloak({
+          url: "https://auth.local",
+          realm: "devops-lvlup",
+          clientId: "habit-tracker"
+        });
+
+        const authenticated = await keycloak.init({
+          onLoad: "check-sso",
+          pkceMethod: "S256",
+          checkLoginIframe: false
+        });
+
+        updateUserInfo();
+
+        if (authenticated) {
+          setMessage("Login successful.", "success");
+          await loadHabits();
+        } else {
+          setMessage("Please login to view habits.", "");
+        }
+      } catch (err) {
+        console.error("Keycloak init failed:", err);
+        setMessage("Authentication initialization failed. Check browser console.", "error");
       }
     }
 
     function login() {
-      keycloak.login();
+      if (!keycloak) {
+        setMessage("Keycloak is not initialized yet.", "error");
+        return;
+      }
+
+      keycloak.login({
+        redirectUri: "https://habit.local"
+      });
     }
 
     function logout() {
+      if (!keycloak) {
+        return;
+      }
+
       keycloak.logout({
         redirectUri: "https://habit.local"
       });
     }
 
+    async function ensureFreshToken() {
+      if (!keycloak || !keycloak.authenticated) {
+        return false;
+      }
+
+      try {
+        await keycloak.updateToken(30);
+        return true;
+      } catch (err) {
+        console.error("Token refresh failed:", err);
+        setMessage("Session expired. Please login again.", "error");
+        return false;
+      }
+    }
+
     async function loadHabits() {
-      if (!keycloak.authenticated) {
+      clearMessage();
+
+      if (!keycloak || !keycloak.authenticated) {
+        updateUserInfo();
         return;
       }
 
-      const res = await fetch("/habits", {
-        headers: {
-          "Authorization": "Bearer " + keycloak.token
+      const tokenOk = await ensureFreshToken();
+      if (!tokenOk) {
+        return;
+      }
+
+      try {
+        const res = await fetch("/habits", {
+          method: "GET",
+          headers: {
+            "Authorization": "Bearer " + keycloak.token
+          }
+        });
+
+        if (res.status === 401) {
+          setMessage("Unauthorized. Please login again.", "error");
+          return;
         }
-      });
 
-      const data = await res.json();
+        if (res.status === 403) {
+          setMessage("You do not have permission to view habits.", "error");
+          return;
+        }
 
-      const list = document.getElementById("habitList");
-      list.innerHTML = "";
+        if (!res.ok) {
+          setMessage("Failed to load habits. Status: " + res.status, "error");
+          return;
+        }
 
-      data.forEach(habit => {
-        const li = document.createElement("li");
-        li.textContent = habit.name;
-        list.appendChild(li);
-      });
+        const data = await res.json();
+        const list = document.getElementById("habitList");
+        list.innerHTML = "";
+
+        data.forEach(habit => {
+          const li = document.createElement("li");
+          li.textContent = `${habit.name} (${habit.created_at})`;
+          list.appendChild(li);
+        });
+
+        if (data.length === 0) {
+          const li = document.createElement("li");
+          li.textContent = "No habits yet.";
+          list.appendChild(li);
+        }
+      } catch (err) {
+        console.error("loadHabits failed:", err);
+        setMessage("Error while loading habits.", "error");
+      }
     }
 
     async function addHabit() {
-      if (!keycloak.authenticated) {
-        alert("Please login first");
+      clearMessage();
+
+      if (!keycloak || !keycloak.authenticated) {
+        setMessage("Please login first.", "error");
         return;
       }
 
-      const name = document.getElementById("habitInput").value;
+      const tokenOk = await ensureFreshToken();
+      if (!tokenOk) {
+        return;
+      }
 
-      const res = await fetch(`/habits?name=${encodeURIComponent(name)}`, {
-        method: "POST",
-        headers: {
-          "Authorization": "Bearer " + keycloak.token
+      const input = document.getElementById("habitInput");
+      const name = input.value.trim();
+
+      if (!name) {
+        setMessage("Please enter a habit name.", "error");
+        return;
+      }
+
+      try {
+        const res = await fetch(`/habits?name=${encodeURIComponent(name)}`, {
+          method: "POST",
+          headers: {
+            "Authorization": "Bearer " + keycloak.token
+          }
+        });
+
+        if (res.status === 401) {
+          setMessage("Unauthorized. Please login again.", "error");
+          return;
         }
-      });
 
-      if (res.status === 403) {
-        alert("You do not have permission to add habits");
-        return;
+        if (res.status === 403) {
+          setMessage("You do not have permission to add habits.", "error");
+          return;
+        }
+
+        if (!res.ok) {
+          setMessage("Failed to add habit. Status: " + res.status, "error");
+          return;
+        }
+
+        input.value = "";
+        setMessage("Habit added successfully.", "success");
+        await loadHabits();
+      } catch (err) {
+        console.error("addHabit failed:", err);
+        setMessage("Error while adding habit.", "error");
       }
-
-      document.getElementById("habitInput").value = "";
-      loadHabits();
     }
 
-    initAuth().then(loadHabits);
+    window.addEventListener("load", initAuth);
   </script>
 </body>
 </html>
