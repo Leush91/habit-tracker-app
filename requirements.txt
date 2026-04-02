@@ -2,4 +2,5 @@ fastapi
 uvicorn[standard]
 psycopg2-binary
 sqlalchemy
-
+PyJWT[crypto]
+httpx
