@@ -7,10 +7,14 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 security = HTTPBearer()
 
-KEYCLOAK_ISSUER = os.getenv("KEYCLOAK_ISSUER", "http://auth.local/realms/devops-lvlup")
+KEYCLOAK_ISSUER = os.getenv(
+    "KEYCLOAK_ISSUER",
+    "http://keycloak.keycloak.svc.cluster.local/realms/devops-lvlup"
+)
+
 KEYCLOAK_JWKS_URL = os.getenv(
     "KEYCLOAK_JWKS_URL",
-    "http://auth.local/realms/devops-lvlup/protocol/openid-connect/certs"
+    "http://keycloak.keycloak.svc.cluster.local/realms/devops-lvlup/protocol/openid-connect/certs"
 )
 KEYCLOAK_CLIENT_ID = os.getenv("KEYCLOAK_CLIENT_ID", "habit-tracker")
 
