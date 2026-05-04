@@ -5,6 +5,8 @@ from .models import Base, Habit
 from .auth import require_roles
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi import Request
+import uuid
 
 app = FastAPI()
 
@@ -37,6 +39,19 @@ def create_habit(
     return habit
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.middleware("http")
+async def correlation_id_middleware(request: Request, call_next):
+    correlation_id = request.headers.get("X-Correlation-Id")
+
+    if not correlation_id:
+        correlation_id = str(uuid.uuid4())
+
+    request.state.correlation_id = correlation_id
+
+    response = await call_next(request)
+    response.headers["X-Correlation-Id"] = correlation_id
+    return response
 
 @app.get("/")
 def serve_frontend():
