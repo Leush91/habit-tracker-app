@@ -43,11 +43,13 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.middleware("http")
 async def correlation_id_middleware(request: Request, call_next):
     correlation_id = request.headers.get("X-Correlation-Id")
+    run_id = request.headers.get("X-Run-Id")
 
     if not correlation_id:
         correlation_id = str(uuid.uuid4())
 
     request.state.correlation_id = correlation_id
+    request.state.run_id = run_id
 
     response = await call_next(request)
     response.headers["X-Correlation-Id"] = correlation_id
